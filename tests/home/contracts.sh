@@ -130,7 +130,7 @@ patch_test_shebang "${test_root}/fake-bin/nix"
 chmod +x "${test_root}/activation/activate" "${test_root}/fake-bin/nix"
 
 export FINITE_HOME_TEMPLATE_PATH="${template}"
-export FINITE_HOME_CATALOG_PATH="${FINITE_GENERATED_ROOT}/bootc/generated/home-profile-catalog.json"
+export FINITE_HOME_CATALOG_PATH="${FINITE_HOME_CATALOG_PATH:-${FINITE_GENERATED_ROOT}/bootc/generated/home-profile-catalog.json}"
 export FINITE_NIX_COMMAND="${test_root}/fake-bin/nix"
 export FINITE_TEST_ACTIVATION="${test_root}/activation"
 export FINITE_TEST_ACTIVATION_LOG="${test_root}/activation.log"

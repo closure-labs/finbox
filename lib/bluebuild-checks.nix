@@ -1,6 +1,7 @@
 {
   applications,
   homeScaffold,
+  homeCatalog,
   lib,
   pkgs,
 }: let
@@ -34,6 +35,7 @@
     '';
 in {
   home = check "home-contracts" (with pkgs; [gawk getent gnugrep jq ripgrep yq-go]) ''
+    export FINITE_HOME_CATALOG_PATH=${homeCatalog}
     bash tests/home/contracts.sh \
       ${applications.homeProfile}/bin/finite-home-profile \
       ${applications.homeInit}/bin/finite-home-init \

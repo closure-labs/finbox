@@ -183,6 +183,7 @@
     '';
   repositoryChecks = import ../lib/bluebuild-checks.nix {
     inherit applications homeScaffold lib pkgs;
+    inherit (imagePayload) homeCatalog;
   };
   formattingSource = lib.cleanSourceWith {
     src = outputDependencies.self;
