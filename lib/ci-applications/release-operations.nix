@@ -202,7 +202,7 @@
               --repo "''${GITHUB_REPOSITORY}" \
               --exit-status
           else
-            dispatch_and_wait build.yml -f validate_only=true
+            dispatch_and_wait build.yml
           fi
           gh pr merge \
             --repo "''${GITHUB_REPOSITORY}" \

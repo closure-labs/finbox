@@ -1,0 +1,56 @@
+{
+  applications,
+  homeScaffold,
+  lib,
+  pkgs,
+}: let
+  source = lib.fileset.toSource {
+    root = ../.;
+    fileset = lib.fileset.unions [
+      ../.github
+      ../recipes
+      ../files/scripts
+      ../scripts/bluebuild
+      ../tests
+      ../modules/aspects
+      ../templates
+      ../lib
+      ../sources
+      ../VERSION
+    ];
+  };
+  check = name: tools: commands:
+    pkgs.runCommand "finite-${name}" {
+      nativeBuildInputs = [pkgs.bash pkgs.coreutils] ++ tools;
+    } ''
+      export HOME="$TMPDIR/home"
+      mkdir -p "$HOME" source
+      cp -R ${source}/. source/
+      chmod -R u+w source
+      cd source
+      export FINITE_HERMETIC_CHECK=true FINITE_SOURCE_ROOT="$PWD"
+      ${commands}
+      touch "$out"
+    '';
+in {
+  home = check "home-contracts" (with pkgs; [gawk getent gnugrep jq ripgrep yq-go]) ''
+    bash tests/home/contracts.sh \
+      ${applications.homeProfile}/bin/finite-home-profile \
+      ${applications.homeInit}/bin/finite-home-init \
+      ${applications.cloudInit}/bin/finite-cloud-init \
+      ${homeScaffold}
+    bash tests/home/dell-panel-policy.sh
+  '';
+  nix-lifecycle = check "nix-lifecycle" (with pkgs; [gnugrep jq systemd util-linux]) ''
+    bash modules/aspects/base/tests/determinate-version.sh
+    bash modules/aspects/base/tests/nix-lifecycle.sh
+    bash modules/aspects/base/tests/nix-systemd.sh
+  '';
+  bluebuild = check "bluebuild-contracts" [(pkgs.python3.withPackages (p: [p.pyyaml]))] ''
+    python3 tests/bluebuild/contracts.py
+  '';
+  workflows = check "workflow-lint" (with pkgs; [actionlint shellcheck]) ''
+    actionlint .github/workflows/*.yml
+    shellcheck --exclude=SC1091 files/scripts/*.sh scripts/bluebuild/*.sh
+  '';
+}

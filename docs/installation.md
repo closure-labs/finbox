@@ -1,127 +1,48 @@
-# Installation and updates
+# Installation
 
-Finite publishes four foundation images:
+The BlueBuild installation path is currently for finbox sandbox acceptance.
+Production/workstation cutover follows successful image, ISO and VM tests.
 
-| Tag | Foundation and hardware |
-| --- | --- |
-| `bluefin-generic` (`latest`) | Bluefin, generic x86-64 |
-| `next` | Bluefin, vendor-neutral x86-64 with Fedora 7.2 |
-| `bluefin-dx-generic` | Bluefin DX, generic x86-64 |
-| `dev-next` | Bluefin DX, vendor-neutral x86-64 with Fedora 7.2 |
+1. Open a successful **Build Finite** run in `closure-labs/finbox`. Select a
+   profile's image evidence, obtain its digest and verify it with the tracked key:
+   `cosign verify --key cosign.pub ghcr.io/closure-labs/finbox@sha256:…`.
+2. Dispatch **Build installation ISO** on `main` with that digest and its channel
+   (`bluefin-generic`, `next`, `bluefin-dx-generic` or `dev-next`). The digest must
+   still match the selected channel when ISO generation starts.
+3. Download the ISO artifact, then run `sha256sum -c SHA256SUMS` beside the ISO
+   and `installation.json`. Check the source and update channel in that record.
+4. Boot the ISO in a disposable UEFI VM and install. The Kinoite variant selects
+   the installer interface; the installed desktop remains Bluefin/GNOME.
+5. After installation, compare `bootc status --json` with the recorded source
+   digest and inspect `/usr/share/finite/profile.json`. Test first login and Nix
+   persistence before selecting the continuing update channel.
 
-Roles are not image tags. Every combination of the six roles is selected per
-user through Home Manager after the foundation boots.
+Each ISO uses a never-reused tag containing its run ID, attempt and UUID. CLI
+v0.9.37 loses digest-only references when constructing installer arguments; the
+workflow verifies a digest, copies it to this unique tag with digest preservation,
+and passes the tag to `generate-iso`. Do not use that one-time tag as a permanent
+update channel.
 
-The next images pin Fedora's `7.2.0-61.fc45` runtime kernel packages. They do
-not install vendor-specific rootfs overlays, external kernel modules, or custom
-camera userspace.
+After validating the installed image and its signing policy, select the channel
+recorded in `installation.json`. For example, in the disposable generic VM:
 
-## Switch an existing bootc system
-
-```console
-sudo bootc switch ghcr.io/closure-labs/finite:latest
-sudo systemctl reboot
-bootc status
-```
-
-Use another tag from the table when appropriate. Update or roll back with:
-
-```console
-sudo bootc upgrade
-sudo systemctl reboot
-# or
-sudo bootc rollback
+```bash
+sudo bootc switch --enforce-container-sigpolicy \
+  ghcr.io/closure-labs/finbox:bluefin-generic
 sudo systemctl reboot
 ```
 
-## First graphical login
+Verify the staged digest and signature policy before rebooting. Then test an
+upgrade, confirm Home Manager and `/var/home/nix` persist, and test rollback.
+The image also records its canonical update reference in
+`/usr/share/finite/update-image`.
 
-`finite-home-first-login.service` runs independently for every local graphical
-user. It exits immediately only when the installed Home Manager flake is
-complete and matches the image template marker. Otherwise it reuses a valid
-`~/.config/finite/profile.json`, imports
-`/etc/finite/home-profiles/$USER.yaml` without prompting, or shows a Zenity
-checklist with all roles initially unchecked.
+The Nix seed lives under `/usr/lib/finite/determinate-nix-seed`. First boot copies
+it into persistent `/var/home/nix`, installs the SELinux policy and mounts `/nix`
+before enabling daemon sockets. Home Manager's first-login flow and standalone
+configuration templates remain available; see [configuration](configuration.md).
 
-Choosing Configure with no roles creates the base-only environment. Canceling
-or closing the dialog writes nothing, and the selector returns at the next
-graphical login. Build or activation errors are shown graphically, recorded in
-the user journal, and retried on a later login. Run `finite-configure` at any
-time to change the selected roles and curated optional Nix packages. The
-running image remains authoritative for the foundation, while Home Manager
-hardware tuning must declare compatibility with its generic or next image
-hardware.
-
-## Provision with cloud-init
-
-Generate a NoCloud seed containing YAML for an installer-created account:
-
-```console
-nix run .#cloud-init -- \
-  --foundation bluefin-dx \
-  --hardware generic-x86_64 \
-  --packages jj,uv \
-  --roles developer,support \
-  --user dale \
-  --output result/cloud-init-dale
-```
-
-Attach `seed.iso` as a NoCloud configuration drive. Cloud-init writes only
-`/etc/finite/home-profiles/dale.yaml`; it does not invoke a named preset, create
-users, replace networking, or change the installer hostname. First-login
-validates and imports the seed.
-
-## Initialize Home Manager manually on Finite
-
-```console
-nix run github:closure-labs/finite#home-profile -- \
-  --foundation bluefin-dx --hardware generic-x86_64 \
-  --packages jj,uv \
-  --roles developer,support --format yaml >profile.yaml
-/usr/libexec/finite/home-init --profile profile.yaml
-```
-
-The initializer validates before writing, copies the complete pinned flake from
-the immutable image, builds the activation package without rewriting its lock,
-swaps aside any older or incomplete Home Manager directory, and activates only
-after the build succeeds. Later local rebuilds use:
-
-```console
-nh home switch
-```
-
-See [Staged Homebrew migration](homebrew-migration.md) before removing any
-formula or cask. The first migration release intentionally leaves every Brew
-fallback installed.
-
-## Determinate Nix lifecycle
-
-Finite installs Fedora's Nix filesystem and account contracts before applying
-the pinned Determinate Nix installer and SELinux policy. `/nix` is backed by
-persistent `/var/home/nix`; image updates never overwrite an existing store.
-Determinate Nixd owns runtime upgrades. Finite removes only stale daemon socket
-files before binding the persistent state.
-
-## Install from ISO
-
-1. Run the `Build and boot-test Finite installer ISO` workflow from `main`.
-2. Select one of the four foundation profiles.
-3. Download the `finite-<profile>-installer` artifact.
-4. Verify it:
-
-   ```console
-   sha256sum --check SHA256SUMS
-   gh attestation verify finite-*.iso --repo closure-labs/finite
-   ```
-
-5. Write the ISO to installation media and complete the graphical Finite installer.
-
-The ISO is a network installer. Connect the live GNOME session to the network
-before starting; Dakota then pulls the exact signed Finite digest recorded in
-the manifest. The installed system tracks the selected tag for later updates.
-
-The manifest records the immutable network payload, signed Dakota SquashFS-seed
-identity, cache source, pinned Project Bluefin installer inputs, source commit,
-and mutable update reference. The payload selection is stored in a small JSON
-file on the ISO and validated again before the graphical installer starts. See
-[Troubleshooting](troubleshooting.md) for runtime and installer checks.
+Dakota source remains in `installer/` for acceptance comparison. Its former
+workflow is dormant in `legacy/workflows`; deletion awaits a successful upstream
+ISO install and update test. The running workstation is switched separately,
+with its previous deployment retained.

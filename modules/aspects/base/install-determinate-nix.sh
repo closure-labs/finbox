@@ -2,10 +2,11 @@
 set -euo pipefail
 
 generated_root="${FINITE_GENERATED_ROOT:?FINITE_GENERATED_ROOT is required}"
-installer="${generated_root}/bootc/generated/determinate-nix-installer"
-lock="${generated_root}/bootc/generated/determinate-nix.json"
-policy="${generated_root}/bootc/generated/determinate-nix.pp"
-file_contexts="${generated_root}/bootc/generated/nix.fc"
+asset_root="${FINITE_ASSET_ROOT:-${generated_root}/bootc/generated}"
+installer="${asset_root}/determinate-nix-installer"
+lock="${asset_root}/determinate-nix.json"
+policy="${asset_root}/determinate-nix.pp"
+file_contexts="${asset_root}/nix.fc"
 seed=/usr/lib/finite/determinate-nix-seed
 
 test -x "${installer}"

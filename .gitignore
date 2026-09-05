@@ -8,3 +8,13 @@
 /release-manifest.json.sha256
 /release-notes.md
 /release-sboms/
+
+# BlueBuild staging (recipes and authored scripts are tracked).
+/files/payload/
+/files/system/
+/files/scripts/lib/
+/files/dnf/
+/.bluebuild/
+/cosign.key
+/.bluebuild-scripts_*
+/.bluebuild-scripts_*/

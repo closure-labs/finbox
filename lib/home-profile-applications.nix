@@ -1,9 +1,9 @@
 {
-  generated,
+  homeCatalog,
   homeScaffold,
   pkgs,
 }: let
-  catalog = "${generated}/bootc/generated/home-profile-catalog.json";
+  catalog = homeCatalog;
   profileRuntimeInputs = with pkgs; [coreutils getent gnugrep jq yq-go];
   homeProfile = pkgs.writeShellApplication {
     name = "finite-home-profile";

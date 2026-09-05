@@ -83,6 +83,9 @@
     profileOrder = profileSet.order;
     inherit version;
   };
+  imagePayload = import ../lib/image-payload.nix {
+    inherit pkgs lib catalog homeScaffold version;
+  };
   architecture = import ../lib/render-architecture.nix {
     inherit den lib pkgs;
     inherit (outputDependencies) diagram;
@@ -93,7 +96,10 @@
     cacheName = cache.name;
     secretspec = outputDependencies.weeklySecretspec;
   };
-  homeApplications = import ../lib/home-profile-applications.nix {inherit generated homeScaffold pkgs;};
+  homeApplications = import ../lib/home-profile-applications.nix {
+    inherit homeScaffold pkgs;
+    inherit (imagePayload) homeCatalog;
+  };
   applications = baseApplications // homeApplications;
   roleModules = map (name: ../modules/aspects/roles + "/${name}/default.nix") catalog.roleNames;
   hardwareModules = map (name: ../modules/aspects/hardware + "/${name}/default.nix") catalog.homeHardwareNames;
@@ -175,8 +181,8 @@
     pkgs.runCommand "finite-home-configurations-proof" {} ''
       touch "$out"
     '';
-  repositoryChecks = import ../lib/repository-checks.nix {
-    inherit applications architecture generated lib pkgs;
+  repositoryChecks = import ../lib/bluebuild-checks.nix {
+    inherit applications homeScaffold lib pkgs;
   };
   formattingSource = lib.cleanSourceWith {
     src = outputDependencies.self;
@@ -196,24 +202,11 @@
     test -e ${formattingValidation}
     touch "$out"
   '';
-  architectureCheck = pkgs.runCommand "finite-architecture-proof" {} ''
-    test -f ${architecture}/architecture.md
-    test -f ${architecture}/namespace.mmd
-    touch "$out"
-  '';
-  profileSchemaCheck = pkgs.runCommand "finite-profile-schema-proof" {} ''
-    test -f ${generated}/bootc/generated/image-matrix.json
-    test -f ${generated}/bootc/generated/profile-catalog.json
-    test -f ${generated}/bootc/generated/home-profile-catalog.json
-    touch "$out"
-  '';
   checks =
     repositoryChecks
     // {
       formatting = formattingCheck;
-      architecture = architectureCheck;
       home-configurations = homeCheck;
-      profile-schema = profileSchemaCheck;
     };
   ciChecks = pkgs.runCommand "finite-ci-checks" {} ''
     mkdir "$out"
@@ -268,7 +261,10 @@
       package = outputDependencies.devenvPackage;
       appProgram = lib.getExe outputDependencies.devenvPackage;
     };
-    default.package = generated;
+    default.package = imagePayload.payload;
+    image-payload.package = imagePayload.payload;
+    image-payload-next.package = imagePayload.next;
+    home-profile-catalog.package = imagePayload.homeCatalog;
     generated.package = generated;
     home-manager-template.package = homeScaffold;
     home-profile = {
