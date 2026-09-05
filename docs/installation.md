@@ -47,3 +47,14 @@ Dakota source remains in `installer/` for acceptance comparison. Its former
 workflow is dormant in `legacy/workflows`; deletion awaits a successful upstream
 ISO install and update test. The running workstation is switched separately,
 with its previous deployment retained.
+
+## Hosted VM acceptance
+
+Dispatch **Test ISO in UEFI VM** with a successful ISO workflow run ID. It verifies
+the artifact checksums and source signature, installs a temporary unattended ISO
+copy in a disposable UEFI VM, checks SELinux and the Nix daemon, activates the
+base Home Manager environment, tests rejection with a wrong signing key, selects
+the continuing channel, checks persistent Nix state/customization after updating,
+and rolls back. It uploads logs and status records; disks and SSH keys stay on
+the ephemeral runner and are removed. Run this for generic and next ISOs before
+production cutover. The script refuses local execution outside finbox Actions.

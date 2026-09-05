@@ -29,7 +29,7 @@ The reference checkout revisions used for implementation are recorded in
 optional reference, not a development dependency.
 
 Before production cutover, verify all four signed images and install generic and
-next variants in disposable UEFI VMs. Check first boot, Nix SELinux setup, Home
+next variants with the manual **Test ISO in UEFI VM** workflow. Check first boot, Nix SELinux setup, Home
 Manager activation, persistence over upgrades, signature rejection and rollback.
 Install an upstream ISO and confirm subsequent bootc updating. Only then remove
 the dormant legacy Containerfiles, Den image composition, CI applications and
