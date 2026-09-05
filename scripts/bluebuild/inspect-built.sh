@@ -15,9 +15,10 @@ else
   image=${images[0]}
 fi
 docker inspect "$image" >".bluebuild/$profile-image.json"
+expected_kernel=$(jq -r .release sources/kernel-next.json)
 docker run --rm --privileged --entrypoint /bin/bash \
   -v "$PWD/scripts/bluebuild/verify-image.sh:/run/verify-image.sh:ro" \
-  "$image" /run/verify-image.sh "$profile" "$repository"
+  "$image" /run/verify-image.sh "$profile" "$repository" "$expected_kernel"
 jq -e '.[0].Config.Labels["org.opencontainers.image.base.digest"] |
   test("^sha256:[0-9a-f]{64}$")' ".bluebuild/$profile-image.json"
 printf '%s\n' "$image" >".bluebuild/$profile-image-ref.txt"

@@ -3,6 +3,7 @@
 set -euo pipefail
 expected="${1:?expected profile required}"
 repository="${2:-ghcr.io/closure-labs/finbox}"
+expected_kernel="${3:-}"
 [[ $(cat /usr/share/finite/build-profile) == "$expected" ]]
 jq -e --arg profile "$expected" '
   .schema == 1 and .profile == $profile and
@@ -13,6 +14,7 @@ rpm -q cloud-init jq nix nix-daemon nix-filesystem nix-system yq zenity \
 mapfile -t kernels < <(rpm -q --qf '%{EVR}.%{ARCH}\n' kernel-core)
 [[ ${#kernels[@]} == 1 ]]
 if [[ $expected == *-next ]]; then
+  [[ -n $expected_kernel && ${kernels[0]} == "$expected_kernel" ]]
   [[ ${kernels[0]} == "$(jq -r .kernelRelease /usr/share/finite/profile.json)" ]]
   for module in intel_cvs intel_ipu7 intel_ipu7_isys ipu_bridge ov02c10; do
     [[ $(modinfo -k "${kernels[0]}" -F intree "$module") == Y ]]

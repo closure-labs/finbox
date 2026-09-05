@@ -220,10 +220,8 @@
   '';
   ciCheck = applications.mkCheck checks;
   localCache = applications.mkLocalCache ciCheck;
-  exportTable = {
+  legacyExportTable = {
     architecture.package = architecture;
-    ci-check.package = ciCheck;
-    ci-checks.package = ciChecks;
     ci-prepare.package = applications.ciPrepare;
     ci-validate-plan.package = applications.validateCiPlan;
     ci-gate.package = applications.ciGate;
@@ -242,18 +240,24 @@
     ci-installer-smoke.package = applications.installerSmoke;
     ci-release-notes.package = applications.releaseNotes;
     ci-release-control.package = applications.releaseControl;
+    ci-source-verify.package = applications.sourceVerify;
+    ci-package-cleanup.package = applications.packageCleanup;
+    ci-load-bluefin.package = applications.loadBluefin;
+    generated.package = generated;
+    syft.package = pkgs.syft;
+  };
+  exportTable = {
+    ci-check.package = ciCheck;
+    ci-checks.package = ciChecks;
     ci-github-output.package = applications.githubOutput;
     ci-fix-nix-hashes.package = applications.fixNixHashes;
     ci-update-locks.package = applications.updateLocks;
     ci-home-release-update.package = applications.updateHomeRelease;
     ci-source-update.package = applications.sourceUpdate;
-    ci-source-verify.package = applications.sourceVerify;
     ci-trusted-update.package = applications.trustedUpdate;
     ci-queue-dependabot.package = applications.queueDependabot;
-    ci-package-cleanup.package = applications.packageCleanup;
     ci-repository-security-audit.package = applications.repositorySecurityAudit;
     ci-github-actions-secrets.package = applications.githubActionsSecrets;
-    ci-load-bluefin.package = applications.loadBluefin;
     ci-lock-validate.package = applications.validateLocks;
     ci-cosign.package = pkgs.cosign;
     ci-oras.package = pkgs.oras;
@@ -266,7 +270,6 @@
     image-payload.package = imagePayload.payload;
     image-payload-next.package = imagePayload.next;
     home-profile-catalog.package = imagePayload.homeCatalog;
-    generated.package = generated;
     home-manager-template.package = homeScaffold;
     home-profile = {
       package = applications.homeProfile;
@@ -280,7 +283,6 @@
       package = applications.homeInit;
       appProgram = "${applications.homeInit}/bin/finite-home-init";
     };
-    syft.package = pkgs.syft;
     cloud-init.appProgram = "${applications.cloudInit}/bin/finite-cloud-init";
     local-cache.appProgram = "${localCache}/bin/finite-local-cache";
     repository-security-audit.appProgram = lib.getExe applications.repositorySecurityAudit;
@@ -317,6 +319,7 @@ in {
       };
     };
     packages.${system} = packageExports;
+    legacyPackages.${system} = lib.mapAttrs (_: export: export.package) legacyExportTable;
 
     apps.${system} = appExports;
 

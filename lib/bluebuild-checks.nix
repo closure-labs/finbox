@@ -48,8 +48,9 @@ in {
     bash modules/aspects/base/tests/nix-lifecycle.sh
     bash modules/aspects/base/tests/nix-systemd.sh
   '';
-  bluebuild = check "bluebuild-contracts" [(pkgs.python3.withPackages (p: [p.pyyaml]))] ''
+  bluebuild = check "bluebuild-contracts" [pkgs.jq (pkgs.python3.withPackages (p: [p.pyyaml]))] ''
     python3 tests/bluebuild/contracts.py
+    python3 tests/bluebuild/iso.py
   '';
   workflows = check "workflow-lint" (with pkgs; [actionlint shellcheck]) ''
     actionlint .github/workflows/*.yml
