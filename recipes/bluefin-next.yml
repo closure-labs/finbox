@@ -10,6 +10,8 @@ alt-tags: [next]
 labels:
   org.opencontainers.image.title: Finite
   org.opencontainers.image.vendor: Closure Labs
+  org.opencontainers.image.url: https://github.com/closure-labs/finbox
+  org.opencontainers.image.revision: "${GITHUB_SHA:-local}"
   io.finite.profile: bluefin-next
   io.finite.foundation: bluefin
   io.finite.hardware: next-x86_64

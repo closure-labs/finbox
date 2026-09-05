@@ -16,6 +16,10 @@ neither publish nor receive signing secrets. Publication runs serialize
 under `finbox-publication`; successful profiles publish independently through
 the upstream action, including its cache and signature handling.
 
+The CLI's named Docker builder uses `default-load=true`, making nonpublishing
+builds available for final inspection on the runner. Publication uses the
+upstream action's explicit registry output with the same builder configuration.
+
 BlueBuild resolves upstream digests during generation/build. Image evidence
 artifacts retain final labels (including base digests), image references,
 signature verification and generated Containerfiles for review. The generated

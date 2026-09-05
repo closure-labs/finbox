@@ -28,6 +28,12 @@ jobs:
       - uses: ./.github/actions/setup-nix
       - name: Stage pinned payload
         run: bash scripts/bluebuild/stage.sh "$PROFILE"
+      - name: Make validation images available for final inspection
+        # CLI v0.9.37 omits --load in Actions. Its named builder can opt in;
+        # publication's explicit registry output still takes precedence.
+        run: >-
+          docker buildx create --name bluebuild --driver docker-container
+          --driver-opt default-load=true
       - name: Build with BlueBuild
         uses: blue-build/github-action@836161eb076426a451e6a0054f722b1153b8b3ad # v1.12.0
         with:
