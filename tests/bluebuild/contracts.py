@@ -72,10 +72,11 @@ class BlueBuildContracts(unittest.TestCase):
         self.assertEqual(action['uses'], 'blue-build/github-action@836161eb076426a451e6a0054f722b1153b8b3ad')
         self.assertEqual(action['with']['cli_version'], 'v0.9.37')
         self.assertEqual(action['with']['push'], '${{ inputs.publish }}')
-        for key in ['registry_token', 'cosign_private_key']:
-            self.assertIn('inputs.publish', action['with'][key])
-            self.assertNotIn('env.', action['with'][key])
-            self.assertIn("|| ''", action['with'][key])
+        self.assertEqual(action['with']['registry_token'], '${{ github.token }}')
+        secret = action['with']['cosign_private_key']
+        self.assertIn('inputs.publish', secret)
+        self.assertNotIn('env.', secret)
+        self.assertIn("|| ''", secret)
         for key in ['rechunk', 'chunkah', 'build_chunked_oci']:
             self.assertFalse(action['with'][key])
         gate = workflow['jobs']['gate']

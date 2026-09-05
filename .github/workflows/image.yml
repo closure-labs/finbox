@@ -35,7 +35,7 @@ jobs:
           cli_version: v0.9.37
           registry: ghcr.io
           registry_namespace: closure-labs
-          registry_token: ${{ inputs.publish && github.token || '' }}
+          registry_token: ${{ github.token }}
           cosign_private_key: ${{ inputs.publish && secrets.cosign_private_key || '' }}
           pr_event_number: ${{ github.event.number || '' }}
           push: ${{ inputs.publish }}
@@ -63,4 +63,3 @@ jobs:
           path: .bluebuild/
           include-hidden-files: true
           retention-days: 14
-

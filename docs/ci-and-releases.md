@@ -10,8 +10,9 @@ Read-only validation and trusted publication each call the same four-profile
 reusable workflow with fixed inputs and token permissions. They use the same
 Docker build mode; rechunking is disabled. Failed
 profiles do not cancel the others. Only trusted main runs in `closure-labs/finbox`
-receive registry credentials and `COSIGN_PRIVATE_KEY`. PR and merge-group
-builds neither publish nor receive signing secrets. Publication runs serialize
+receive registry write permissions and `COSIGN_PRIVATE_KEY`. Validation uses its
+read-only job token for registry authentication. PR and merge-group builds
+neither publish nor receive signing secrets. Publication runs serialize
 under `finbox-publication`; successful profiles publish independently through
 the upstream action, including its cache and signature handling.
 
