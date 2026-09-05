@@ -24,7 +24,7 @@ elif name=='skopeo':
   digest=os.environ['DIGEST']
   if os.environ.get('MOVED_CHANNEL') and args[-1].endswith(':bluefin-generic'): digest='sha256:'+'b'*64
   if '--format' in args: print(digest)
-  else: print(json.dumps({'Digest':digest,'Labels':{'io.finite.profile':'bluefin-generic'}}))
+  else: print(json.dumps({'Digest':digest,'Labels':{'io.finite.profile':'bluefin-next' if os.environ.get('MISMATCH_PROFILE') else 'bluefin-generic'}}))
 elif name=='sudo':
  assert args[0:2]==['bluebuild','generate-iso']
  assert args[args.index('--variant')+1]=='kinoite'
@@ -69,8 +69,15 @@ class IsoBoundary(unittest.TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertFalse(any(c[:2]==['skopeo','copy'] or c[0]=='sudo' for c in calls))
 
-    def test_moved_channel_never_copies_or_builds(self):
-        _,result,calls=self.run_iso(MOVED_CHANNEL='1')
+    def test_moved_channel_keeps_the_requested_verified_digest(self):
+        root,result,calls=self.run_iso(MOVED_CHANNEL='1')
+        self.assertEqual(result.returncode,0,result.stderr)
+        record=json.loads((root/'.bluebuild/iso/installation.json').read_text())
+        self.assertEqual(record['image'],'ghcr.io/closure-labs/finbox@'+DIGEST)
+        self.assertFalse(any(c[:2]==['skopeo','inspect'] and c[-1].endswith(':bluefin-generic') for c in calls))
+
+    def test_wrong_profile_never_copies_or_builds(self):
+        _,result,calls=self.run_iso(MISMATCH_PROFILE='1')
         self.assertNotEqual(result.returncode,0)
         self.assertFalse(any(c[:2]==['skopeo','copy'] or c[0]=='sudo' for c in calls))
 

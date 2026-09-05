@@ -47,7 +47,7 @@ xorriso -osirrox on -indev "${isos[0]}" -extract /boot/grub2/grub.cfg "$state/gr
 sed -i -e 's/quiet/console=ttyS0,115200n8 inst.ks=cdrom:\/ks.cfg/g' \
   -e 's/set default=.*/set default="0"/' -e 's/set timeout=.*/set timeout=1/' "$state/grub.cfg"
 xorriso -indev "${isos[0]}" -outdev "$state/install.iso" -boot_image any replay \
-  -map "$state/ks.cfg" /ks.cfg -chmod 0444 /ks.cfg \
+  -map "$state/ks.cfg" /ks.cfg -chmod 0444 /ks.cfg -- \
   -map "$state/grub.cfg" /boot/grub2/grub.cfg
 cp /usr/share/OVMF/OVMF_VARS_4M.fd "$state/OVMF_VARS.fd"
 qemu-img create -f qcow2 "$state/disk.qcow2" 64G

@@ -30,9 +30,32 @@ jobs:
       - run: nix build --accept-flake-config --no-link .#ci-checks
 
   images:
-    name: Image (${{ matrix.profile }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    name: Validate (${{ matrix.profile }})
+    if: ${{ !(github.repository == 'closure-labs/finbox' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')) }}
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: bluefin-generic
+            channel: bluefin-generic
+          - profile: bluefin-next
+            channel: next
+          - profile: bluefin-dx-generic
+            channel: bluefin-dx-generic
+          - profile: bluefin-dx-next
+            channel: dev-next
+    uses: ./.github/workflows/image.yml
+    with:
+      profile: ${{ matrix.profile }}
+      channel: ${{ matrix.channel }}
+      publish: false
+
+  publish:
+    name: Publish (${{ matrix.profile }})
+    if: github.repository == 'closure-labs/finbox' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       packages: write
@@ -48,59 +71,26 @@ jobs:
             channel: bluefin-dx-generic
           - profile: bluefin-dx-next
             channel: dev-next
-    env:
-      PROFILE: ${{ matrix.profile }}
-      CHANNEL: ${{ matrix.channel }}
-      PUBLISH: ${{ github.repository == 'closure-labs/finbox' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-nix
-      - name: Stage pinned payload
-        run: bash scripts/bluebuild/stage.sh "$PROFILE"
-      - name: Build with BlueBuild
-        uses: blue-build/github-action@836161eb076426a451e6a0054f722b1153b8b3ad # v1.12.0
-        with:
-          recipe: ${{ matrix.profile }}.yml
-          cli_version: v0.9.37
-          registry: ghcr.io
-          registry_namespace: closure-labs
-          registry_token: ${{ env.PUBLISH == 'true' && github.token || '' }}
-          cosign_private_key: ${{ env.PUBLISH == 'true' && secrets.COSIGN_PRIVATE_KEY || '' }}
-          pr_event_number: ${{ github.event.number || '' }}
-          push: ${{ env.PUBLISH }}
-          skip_checkout: true
-          use_cache: true
-          rechunk: false
-          chunkah: false
-          build_chunked_oci: false
-          build_opts: --build-driver docker --run-driver docker
-      - name: Validate recipes and record generated Containerfile
-        run: |
-          mkdir -p .bluebuild
-          bluebuild validate "recipes/$PROFILE.yml"
-          bluebuild generate --registry ghcr.io --registry-namespace closure-labs \
-            -o ".bluebuild/$PROFILE.Containerfile" "recipes/$PROFILE.yml"
-      - name: Verify assembled image after upstream cleanup
-        run: bash scripts/bluebuild/inspect-built.sh "$PROFILE" "$CHANNEL" "$PUBLISH"
-      - name: Save build evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: image-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .bluebuild/
-          include-hidden-files: true
-          retention-days: 14
+    uses: ./.github/workflows/image.yml
+    with:
+      profile: ${{ matrix.profile }}
+      channel: ${{ matrix.channel }}
+      publish: true
+    secrets:
+      cosign_private_key: ${{ secrets.COSIGN_PRIVATE_KEY }}
 
   gate:
     name: CI gate
     if: always()
-    needs: [checks, images]
+    needs: [checks, images, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       CHECKS: ${{ needs.checks.result }}
       IMAGES: ${{ needs.images.result }}
+      PUBLISH: ${{ needs.publish.result }}
     steps:
-      - run: test "$CHECKS" = success && test "$IMAGES" = success
+      - run: |
+          [[ "$CHECKS" == success ]]
+          [[ ("$IMAGES" == success && "$PUBLISH" == skipped) ||
+             ("$IMAGES" == skipped && "$PUBLISH" == success) ]]

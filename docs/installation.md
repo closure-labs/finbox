@@ -7,8 +7,9 @@ Production/workstation cutover follows successful image, ISO and VM tests.
    profile's image evidence, obtain its digest and verify it with the tracked key:
    `cosign verify --key cosign.pub ghcr.io/closure-labs/finbox@sha256:…`.
 2. Dispatch **Build installation ISO** on `main` with that digest and its channel
-   (`bluefin-generic`, `next`, `bluefin-dx-generic` or `dev-next`). The digest must
-   still match the selected channel when ISO generation starts.
+   (`bluefin-generic`, `next`, `bluefin-dx-generic` or `dev-next`). The signed digest
+   must belong to the selected profile; daily builds may advance the channel
+   while the ISO request is queued.
 3. Download the ISO artifact, then run `sha256sum -c SHA256SUMS` beside the ISO
    and `installation.json`. Check the source and update channel in that record.
 4. Boot the ISO in a disposable UEFI VM and install. The Kinoite variant selects

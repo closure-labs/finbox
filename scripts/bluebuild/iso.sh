@@ -20,10 +20,10 @@ volume_id="finbox-x86_64-$tag"
 # List must succeed: authentication/transport errors are not proof of absence.
 skopeo list-tags "docker://$repository" >.bluebuild/iso/tags.json
 jq -e --arg tag "$tag" '.Tags | index($tag) == null' .bluebuild/iso/tags.json >/dev/null
-# Verify the requested channel and profile correspond to the supplied digest.
-skopeo inspect "docker://$repository:$channel" >.bluebuild/iso/channel.json
-[[ $(jq -r .Digest .bluebuild/iso/channel.json) == "$digest" ]]
-profile=$(jq -er '.Labels["io.finite.profile"]' .bluebuild/iso/channel.json)
+# Inspect the verified digest, not a channel that daily builds may have advanced.
+skopeo inspect "docker://$source" >.bluebuild/iso/source.json
+[[ $(jq -r .Digest .bluebuild/iso/source.json) == "$digest" ]]
+profile=$(jq -er '.Labels["io.finite.profile"]' .bluebuild/iso/source.json)
 case "$channel:$profile" in
 bluefin-generic:bluefin-generic|latest:bluefin-generic|next:bluefin-next|bluefin-dx-generic:bluefin-dx-generic|dev-next:bluefin-dx-next) ;;
 *) echo 'Image profile does not match the requested channel' >&2; exit 1 ;;

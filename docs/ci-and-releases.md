@@ -6,7 +6,9 @@ PRs, merge groups and manual dispatches. The pinned action is BlueBuild v1.12.0
 (`836161eb076426a451e6a0054f722b1153b8b3ad`) and the CLI is v0.9.37.
 
 The `CI gate` requires both the Nix/runtime checks and every image job to pass.
-The four jobs use the same Docker build mode; rechunking is disabled. Failed
+Read-only validation and trusted publication each call the same four-profile
+reusable workflow with fixed inputs and token permissions. They use the same
+Docker build mode; rechunking is disabled. Failed
 profiles do not cancel the others. Only trusted main runs in `closure-labs/finbox`
 receive registry credentials and `COSIGN_PRIVATE_KEY`. PR and merge-group
 builds neither publish nor receive signing secrets. Publication runs serialize

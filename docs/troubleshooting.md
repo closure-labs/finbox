@@ -117,8 +117,9 @@ image build. Prefer hosted runners for the four full builds.
 ## Diagnose an ISO build
 
 The manual ISO workflow validates its source digest and signature before creating
-a unique installation tag. A digest/channel mismatch means the channel moved;
-select the newly accepted digest rather than reusing an old installation tag.
+a unique installation tag. A profile/channel mismatch means the selected image
+belongs to a different recipe. Advancing a channel does not change a queued ISO
+request: generation uses the explicit verified digest.
 Inspect the workflow log, `installation.json`, `signature.json` and `SHA256SUMS`.
 The package must be readable by the installer. After a disposable VM installation,
 compare `bootc status --json` with the source record and explicitly switch to the

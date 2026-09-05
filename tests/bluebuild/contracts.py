@@ -54,21 +54,34 @@ class BlueBuildContracts(unittest.TestCase):
         images = workflow['jobs']['images']
         self.assertFalse(images['strategy']['fail-fast'])
         self.assertEqual({p['profile'] for p in images['strategy']['matrix']['include']}, set(EXPECTED))
-        trust = images['env']['PUBLISH']
+        self.assertEqual(images['permissions']['packages'], 'read')
+        self.assertNotIn('secrets', images)
+        self.assertFalse(images['with']['publish'])
+        publish = workflow['jobs']['publish']
+        trust = publish['if']
         for required in ['closure-labs/finbox', "github.ref == 'refs/heads/main'", "github.event_name == 'push'"]:
             self.assertIn(required, trust)
-        action = next(s for s in images['steps'] if s.get('uses', '').startswith('blue-build/'))
+            self.assertIn(required, images['if'])
+        self.assertEqual(publish['strategy'], images['strategy'])
+        self.assertTrue(publish['with']['publish'])
+        self.assertEqual(publish['permissions']['packages'], 'write')
+        reusable = read('.github/workflows/image.yml')
+        build = reusable['jobs']['build']
+        self.assertNotIn('permissions', build)  # inherits the caller's token scope
+        action = next(s for s in build['steps'] if s.get('uses', '').startswith('blue-build/'))
         self.assertEqual(action['uses'], 'blue-build/github-action@836161eb076426a451e6a0054f722b1153b8b3ad')
         self.assertEqual(action['with']['cli_version'], 'v0.9.37')
+        self.assertEqual(action['with']['push'], '${{ inputs.publish }}')
         for key in ['registry_token', 'cosign_private_key']:
-            self.assertIn("env.PUBLISH == 'true'", action['with'][key])
+            self.assertIn('inputs.publish', action['with'][key])
+            self.assertNotIn('env.', action['with'][key])
             self.assertIn("|| ''", action['with'][key])
         for key in ['rechunk', 'chunkah', 'build_chunked_oci']:
             self.assertFalse(action['with'][key])
         gate = workflow['jobs']['gate']
         self.assertEqual(gate['name'], 'CI gate')
         self.assertEqual(gate['if'], 'always()')
-        self.assertEqual(set(gate['needs']), {'checks', 'images'})
+        self.assertEqual(set(gate['needs']), {'checks', 'images', 'publish'})
 
     def test_runtime_catalog_has_no_build_graph(self):
         source = (ROOT / 'lib/image-payload.nix').read_text()

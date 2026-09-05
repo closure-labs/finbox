@@ -18,6 +18,9 @@
       ../lib
       ../sources
       ../VERSION
+      ../flake.nix
+      ../flake.lock
+      ../docs
     ];
   };
   check = name: tools: commands:
@@ -53,8 +56,21 @@ in {
     python3 tests/bluebuild/iso.py
     python3 tests/bluebuild/kernel.py
   '';
-  workflows = check "workflow-lint" (with pkgs; [actionlint shellcheck]) ''
+  dependency-updates =
+    check "dependency-update-contracts" (with pkgs; [
+      gnugrep
+      jq
+      applications.fixNixHashes
+      applications.trustedUpdate
+      applications.updateHomeRelease
+    ]) ''
+      bash tests/automation/fix-nix-hashes.sh
+      bash tests/automation/trusted-update.sh
+      bash tests/automation/update-home-release.sh
+    '';
+  workflows = check "workflow-lint" (with pkgs; [actionlint shellcheck zizmor]) ''
     actionlint .github/workflows/*.yml
+    zizmor --offline --no-config --collect=all .github
     shellcheck --exclude=SC1091 files/scripts/*.sh scripts/bluebuild/*.sh
   '';
 }
