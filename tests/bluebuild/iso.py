@@ -28,7 +28,7 @@ elif name=='skopeo':
 elif name=='sudo':
  assert args[0:2]==['bluebuild','generate-iso']
  assert args[args.index('--variant')+1]=='kinoite'
- assert args[-2]=='image' and ':iso-' in args[-1] and '@' not in args[-1]
+ assert args[-2]=='image' and ':i' in args[-1] and '@' not in args[-1]
  path=pathlib.Path(args[args.index('--output-dir')+1])/args[args.index('--iso-name')+1]
  path.write_bytes(b'fixture ISO')
 '''
@@ -56,7 +56,8 @@ class IsoBoundary(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         record=json.loads((root/'.bluebuild/iso/installation.json').read_text())
         self.assertEqual(record['image'],'ghcr.io/closure-labs/finbox@'+DIGEST)
-        self.assertRegex(record['installationTag'],r':iso-123-2-[a-f0-9-]{36}$')
+        self.assertRegex(record['installationTag'],r':i[a-f0-9]{16}$')
+        self.assertLessEqual(len('finbox-x86_64-'+record['installationTag'].split(':')[-1]),32)
         self.assertEqual(record['updateChannel'],'ghcr.io/closure-labs/finbox:bluefin-generic')
         copy=next(c for c in calls if c[:2]==['skopeo','copy'])
         self.assertIn('--preserve-digests',copy)

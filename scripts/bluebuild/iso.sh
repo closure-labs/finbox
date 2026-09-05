@@ -11,8 +11,12 @@ repository=ghcr.io/closure-labs/finbox
 source="$repository@$digest"
 mkdir -p .bluebuild/iso
 cosign verify --key cosign.pub "$source" >.bluebuild/iso/signature.json
-# A fresh UUID plus run and attempt makes tags unique even across retries.
-tag="iso-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}-$(cat /proc/sys/kernel/random/uuid)"
+# Lorax uses finbox-x86_64-TAG as the ISO volume ID (at most 32 bytes).
+# Keep 64 random bits plus a prefix; reject any existing tag before copying.
+tag="i$(printf '%s-%s-%s' "${GITHUB_RUN_ID:?}" "${GITHUB_RUN_ATTEMPT:?}" \
+  "$(cat /proc/sys/kernel/random/uuid)" | sha256sum | cut -c1-16)"
+volume_id="finbox-x86_64-$tag"
+[[ ${#volume_id} -le 32 ]]
 # List must succeed: authentication/transport errors are not proof of absence.
 skopeo list-tags "docker://$repository" >.bluebuild/iso/tags.json
 jq -e --arg tag "$tag" '.Tags | index($tag) == null' .bluebuild/iso/tags.json >/dev/null

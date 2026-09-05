@@ -17,7 +17,8 @@ Production/workstation cutover follows successful image, ISO and VM tests.
    digest and inspect `/usr/share/finite/profile.json`. Test first login and Nix
    persistence before selecting the continuing update channel.
 
-Each ISO uses a never-reused tag containing its run ID, attempt and UUID. CLI
+Each ISO uses a short random tag, checked against existing registry tags before
+copying. Its length fits the installer's 32-byte volume-label limit. CLI
 v0.9.37 loses digest-only references when constructing installer arguments; the
 workflow verifies a digest, copies it to this unique tag with digest preservation,
 and passes the tag to `generate-iso`. Do not use that one-time tag as a permanent

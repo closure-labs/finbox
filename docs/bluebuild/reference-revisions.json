@@ -1,7 +1,9 @@
 {
   "cli": {
     "url": "https://github.com/blue-build/cli.git",
-    "revision": "b01c4d22d9c5e12cfe9e09087d21e6050642ad56"
+    "revision": "b01c4d22d9c5e12cfe9e09087d21e6050642ad56",
+    "reviewedRevision": "513065f998825e2de59f2e51ad1647fd0666f652",
+    "installerAmd64Digest": "sha256:7d881ae7764cd3afeb3337066a596f262bf0691192a23d5b6766b07c044378d1"
   },
   "modules": {
     "url": "https://github.com/blue-build/modules.git",
@@ -13,7 +15,8 @@
   },
   "github-action": {
     "url": "https://github.com/blue-build/github-action.git",
-    "revision": "2f3ad44fe1c1f09d5144f69dc118baee7ca6b008"
+    "revision": "2f3ad44fe1c1f09d5144f69dc118baee7ca6b008",
+    "reviewedRevision": "836161eb076426a451e6a0054f722b1153b8b3ad"
   },
   "template": {
     "url": "https://github.com/blue-build/template.git",
