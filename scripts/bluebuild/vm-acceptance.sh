@@ -9,8 +9,10 @@ artifact=$(realpath "${1:?ISO artifact directory required}")
 state="$PWD/.bluebuild/vm"
 mkdir -p "$state"
 (cd "$artifact" && sha256sum -c SHA256SUMS)
-jq -e --slurpfile expected sources/bluebuild-installer.json '
-  .installer.resolvedImage == ($expected[0].image + "@" + $expected[0].digest)
+hook_sha=$(sha256sum files/installer/install_finite_fstab | cut -d' ' -f1)
+jq -e --slurpfile expected sources/bluebuild-installer.json --arg hash "$hook_sha" '
+  .installer.resolvedImage == ($expected[0].image + "@" + $expected[0].digest) and
+  .installer.postInstallHook.sha256 == $hash
 ' "$artifact/installation.json" >/dev/null || {
   echo 'Rebuild this ISO with the current locked installer before acceptance testing.' >&2
   exit 2
@@ -113,9 +115,18 @@ boot_vm() {
       ssh "${ssh_args[@]}" sudo bash -s <scripts/bluebuild/wait-nix.sh | tee "$state/$phase-nix.log"
       ssh "${ssh_args[@]}" sudo journalctl --no-pager -b -u systemd-remount-fs \
         >"$state/$phase-remount.log"
+      ssh "${ssh_args[@]}" sudo journalctl --no-pager -b -u mcelog >"$state/$phase-mcelog.log"
       ssh "${ssh_args[@]}" systemctl --failed --no-pager >"$state/$phase-failed-units.log"
       ssh "${ssh_args[@]}" cat /etc/fstab >"$state/$phase-fstab.log"
       ssh "${ssh_args[@]}" findmnt --json >"$state/$phase-mounts.json"
+      ssh "${ssh_args[@]}" systemctl is-active --quiet systemd-remount-fs.service
+      ssh "${ssh_args[@]}" bash -s <<'KERNEL' | tee "$state/$phase-kernel.log"
+set -euo pipefail
+expected=$(jq -er .kernelRelease /usr/share/finite/profile.json)
+running=$(uname -r)
+printf 'Running kernel: %s; image kernel: %s\n' "$running" "$expected"
+[[ $running == "$expected" ]]
+KERNEL
       return
     fi
     sleep 5

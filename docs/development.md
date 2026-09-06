@@ -47,7 +47,8 @@ Verified runs for the BlueBuild replacement:
 | Four profiles with read-only publication permissions and no signing secret | Passed | [Validation 33999999603](https://github.com/closure-labs/finbox/actions/runs/33999999603) |
 | Generic ISO generation with installer v1.5.0 | Passed | [ISO 34002504402](https://github.com/closure-labs/finbox/actions/runs/34002504402) |
 | Generic UEFI installation, Nix/SELinux, Home Manager, signature rejection, update and rollback | Passed | [VM 34003726524](https://github.com/closure-labs/finbox/actions/runs/34003726524) |
-| Next-kernel ISO and VM acceptance | Pending | [ISO 34004385015](https://github.com/closure-labs/finbox/actions/runs/34004385015) |
+| Next-kernel ISO generation and functional VM acceptance | Passed | [ISO 34004385015](https://github.com/closure-labs/finbox/actions/runs/34004385015), [VM 34005002016](https://github.com/closure-labs/finbox/actions/runs/34005002016) |
+| Generic and next installation with successful composefs remounting | Pending | Installer root finalization added after the functional runs |
 
 The generic VM installed signed index
 `sha256:c2ad1b5523074eddf9ed2d07dd3d396e6f1c5475e43aeba514aaf46d37b7eaba`,
@@ -56,6 +57,8 @@ its original deployment checksum. Run artifacts contain the architecture
 manifest digests, bootc status records and service logs. Production and physical
 workstation acceptance remain separate gates.
 
-The successful generic run also reported `systemd-remount-fs.service` failing
-at boot. Its cause is under investigation; the next VM run captures its journal,
-mount layout and fstab. Passing the functional checks does not close that issue.
+Both functional runs also reported `systemd-remount-fs.service` failing at boot.
+The next VM's journal and fstab confirmed [bootc issue 971](https://github.com/bootc-dev/bootc/issues/971):
+physical Btrfs root options were reapplied to the composefs overlay. Installer
+root finalization now removes that entry after verifying the boot arguments.
+Fresh ISO and VM runs must verify this correction before sandbox acceptance.

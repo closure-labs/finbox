@@ -28,10 +28,20 @@ docker run --rm --entrypoint /bin/bash "$source" -euo pipefail -c '
     exit 1
   fi
 '
-# CLI v0.9.37 has no installer-image option. This local alias keeps generate-iso
-# usable with the fixed upstream release; neither registry tag is changed.
+# Use the upstream install_* hook mechanism to finalize the physical root fstab.
+# CLI v0.9.37 has no installer-image option, so the result uses its local alias.
+hook=files/installer/install_finite_fstab
+hook_sha=$(sha256sum "$hook" | cut -d' ' -f1)
 printf 'Using installer %s (%s) through local CLI compatibility alias %s\n' "$version" "$source" "$alias"
-docker tag "$source" "$alias"
-[[ $(docker inspect --format '{{.Id}}' "$alias") == "$(docker inspect --format '{{.Id}}' "$source")" ]]
+docker build --pull=false --network=none --file files/installer/Containerfile --build-arg "INSTALLER=$source" \
+  --label "io.finite.installer-hook-sha256=$hook_sha" --tag "$alias" files/installer
+actual_hook_sha=$(docker run --rm --entrypoint sha256sum "$alias" \
+  /build-container-installer/lorax_templates/scripts/post/install_finite_fstab | cut -d' ' -f1)
+[[ $actual_hook_sha == "$hook_sha" ]]
+image_id=$(docker inspect --format '{{.Id}}' "$alias")
 mkdir -p .bluebuild/iso
-jq --arg resolved "$source" '. + {resolvedImage: $resolved}' "$lock" >.bluebuild/iso/installer.json
+jq --arg resolved "$source" --arg id "$image_id" --arg hook "$hook" \
+  --arg hash "$hook_sha" --arg revision "${GITHUB_SHA:?}" \
+  '. + {resolvedImage: $resolved, localImageId: $id, finiteRevision: $revision,
+    postInstallHook: {path: $hook, sha256: $hash}}' \
+  "$lock" >.bluebuild/iso/installer.json

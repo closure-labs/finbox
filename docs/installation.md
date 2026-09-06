@@ -27,12 +27,19 @@ update channel.
 
 The workflow uses upstream installer v1.5.0, pinned by digest in
 `sources/bluebuild-installer.json`. CLI v0.9.37 hardcodes the older v1.4.0 image,
-so the ephemeral ISO runner gives the verified v1.5.0 image that local alias
-and explicitly uses Docker. It changes no upstream registry tags. The actual
-installer version, digest and alias are recorded in `installation.json`.
+so the ephemeral ISO runner builds a small derivative containing Finite's
+post-install hook and gives it that local alias. It explicitly uses Docker and
+changes no upstream registry tags. `installation.json` records the upstream
+version and digest, local image ID, hook checksum, Finite revision and alias.
 This avoids the older Lorax cleanup that removes `load_policy`, causing
 Anaconda to fail at shutdown after installation reports completion. A preflight
 check rejects an installer that still removes this SELinux utility.
+
+The hook uses the installer's supported `install_*` post-script mechanism. It
+removes only `/` from the installed `fstab`, after checking that every boot entry
+already identifies the physical root and any required Btrfs subvolume. Other
+mounts remain intact. This follows [bootc's physical-root guidance](https://github.com/bootc-dev/bootc/blob/main/docs/src/bootc-install.md)
+and avoids [the composefs remount conflict](https://github.com/bootc-dev/bootc/issues/971).
 
 After validating the installed image and its signing policy, select the channel
 recorded in `installation.json`. For example, in the disposable generic VM:
@@ -73,4 +80,5 @@ The Actions log streams the guest console and timestamps each boot phase. The
 unattended installer kernel must start within three minutes; installation has
 a 45-minute limit. After SSH becomes available, the test waits up to three
 minutes for every Nix initialization unit and daemon socket to become active.
-Failure artifacts retain the console and Nix service logs for diagnosis.
+It also requires the root remount service to succeed on each boot. Artifacts
+retain console and service logs, fstab, and mount layouts for diagnosis.

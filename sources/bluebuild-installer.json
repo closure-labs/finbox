@@ -5,5 +5,6 @@
   "revision": "bed71f841c250650a70f1ed8315ba92da1591ba6",
   "cliAlias": "ghcr.io/jasonn3/build-container-installer:v1.4.0",
   "reason": "CLI v0.9.37 hardcodes v1.4.0. v1.5.0 uses Fedora 44 Lorax, which retains load_policy for Anaconda shutdown. The alias exists only on the ephemeral ISO runner.",
-  "loraxFix": "https://github.com/weldr/lorax/commit/e5097230917fad0ce372b54ebefb2f0e2e2396f3"
+  "loraxFix": "https://github.com/weldr/lorax/commit/e5097230917fad0ce372b54ebefb2f0e2e2396f3",
+  "rootFstabFix": "https://github.com/bootc-dev/bootc/issues/971"
 }

@@ -11,6 +11,7 @@
       ../.github
       ../recipes
       ../files/scripts
+      ../files/installer
       ../scripts/bluebuild
       ../tests
       ../modules/aspects
@@ -56,6 +57,7 @@ in {
     python3 tests/bluebuild/contracts.py
     python3 tests/bluebuild/iso.py
     python3 tests/bluebuild/kernel.py
+    python3 tests/bluebuild/installer.py
   '';
   vm-iso = check "vm-iso-layout" (with pkgs; [diffutils gnugrep gnused libisoburn mtools]) ''
     bash tests/bluebuild/vm-iso.sh
@@ -76,5 +78,6 @@ in {
     actionlint .github/workflows/*.yml
     zizmor --offline --no-config --collect=all .github
     shellcheck --exclude=SC1091 files/scripts/*.sh scripts/bluebuild/*.sh
+    shellcheck -s bash files/installer/install_finite_fstab
   '';
 }

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Exercise the ISO boundary without downloading images or running containers."""
+import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 import unittest
@@ -11,7 +13,7 @@ import unittest
 SCRIPT = Path(__file__).resolve().parents[2] / 'scripts/bluebuild/iso.sh'
 DIGEST = 'sha256:' + 'a' * 64
 MOCK = '''#!/usr/bin/env python3
-import json,os,sys,pathlib
+import hashlib,json,os,sys,pathlib
 name=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
 with open('calls.jsonl','a') as f: f.write(json.dumps([name,*args])+'\\n')
@@ -33,12 +35,19 @@ elif name=='sudo':
  path=pathlib.Path(args[args.index('--output-dir')+1])/args[args.index('--iso-name')+1]
  path.write_bytes(b'fixture ISO')
 elif name=='docker':
- if args[0]=='inspect':
+ if args[0]=='build':
+  assert pathlib.Path(args[args.index('--file')+1]).is_file()
+  assert pathlib.Path(args[-1],'install_finite_fstab').is_file()
+ elif args[0]=='inspect':
   if '--format' in args: print('sha256:'+'c'*64)
   else:
    lock=json.loads(pathlib.Path('sources/bluebuild-installer.json').read_text())
    print(json.dumps([{'Config':{'Labels':{'org.opencontainers.image.version':lock['version'],'org.opencontainers.image.revision':'wrong' if os.environ.get('BAD_INSTALLER_LABEL') else lock['revision']}}}]))
- elif args[0]=='run' and os.environ.get('BAD_INSTALLER_CLEANUP'): sys.exit(1)
+ elif args[0]=='run':
+  if os.environ.get('BAD_INSTALLER_CLEANUP'): sys.exit(1)
+  if 'sha256sum' in args:
+   value=hashlib.sha256(pathlib.Path('files/installer/install_finite_fstab').read_bytes()).hexdigest()
+   print(('bad' if os.environ.get('BAD_INSTALLER_HOOK') else value)+'  hook')
 '''
 
 class IsoBoundary(unittest.TestCase):
@@ -54,9 +63,10 @@ class IsoBoundary(unittest.TestCase):
             tool.chmod(0o755)
         (root/'sources').mkdir()
         (root/'sources/bluebuild-installer.json').write_text((SCRIPT.parents[2]/'sources/bluebuild-installer.json').read_text())
+        shutil.copytree(SCRIPT.parents[2]/'files/installer', root/'files/installer')
         env = dict(os.environ, PATH=str(bindir)+':'+os.environ['PATH'], DIGEST=DIGEST,
                    GITHUB_ACTIONS='true', GITHUB_REPOSITORY='closure-labs/finbox',
-                   GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', **extra)
+                   GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', GITHUB_SHA='d'*40, **extra)
         result = subprocess.run(['bash',str(SCRIPT),'bluefin-generic',DIGEST],cwd=root,env=env,capture_output=True,text=True)
         self.assertTrue((root/'calls.jsonl').exists(), result.stderr)
         calls=[json.loads(l) for l in (root/'calls.jsonl').read_text().splitlines()]
@@ -72,9 +82,11 @@ class IsoBoundary(unittest.TestCase):
         self.assertEqual(record['updateChannel'],'ghcr.io/closure-labs/finbox:bluefin-generic')
         self.assertEqual(record['installer']['version'],'v1.5.0')
         self.assertIn('@sha256:',record['installer']['resolvedImage'])
-        alias=next(c for c in calls if c[:2]==['docker','tag'])
-        self.assertEqual(alias[2],record['installer']['resolvedImage'])
-        self.assertEqual(alias[3],record['installer']['cliAlias'])
+        build=next(c for c in calls if c[:2]==['docker','build'])
+        self.assertEqual(build[build.index('--build-arg')+1],'INSTALLER='+record['installer']['resolvedImage'])
+        self.assertEqual(build[build.index('--tag')+1],record['installer']['cliAlias'])
+        self.assertEqual(record['installer']['postInstallHook']['sha256'],hashlib.sha256((root/'files/installer/install_finite_fstab').read_bytes()).hexdigest())
+        self.assertEqual(record['installer']['finiteRevision'],'d'*40)
         self.assertFalse(any(c[:2]==['docker','push'] for c in calls))
         copy=next(c for c in calls if c[:2]==['skopeo','copy'])
         self.assertIn('--preserve-digests',copy)
@@ -92,7 +104,12 @@ class IsoBoundary(unittest.TestCase):
             with self.subTest(failure=failure):
                 _,result,calls=self.run_iso(**{failure:'1'})
                 self.assertNotEqual(result.returncode,0)
-                self.assertFalse(any(c[:2] in [['skopeo','copy'],['docker','tag']] or c[0]=='sudo' for c in calls))
+                self.assertFalse(any(c[:2] in [['skopeo','copy'],['docker','build']] or c[0]=='sudo' for c in calls))
+
+    def test_installer_hook_must_match_the_reviewed_source(self):
+        _,result,calls=self.run_iso(BAD_INSTALLER_HOOK='1')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any(c[:2]==['skopeo','copy'] or c[0]=='sudo' for c in calls))
 
     def test_moved_channel_keeps_the_requested_verified_digest(self):
         root,result,calls=self.run_iso(MOVED_CHANNEL='1')
