@@ -89,6 +89,13 @@ until grep -qF 'inst.ks=cdrom:/ks.cfg' "$state/install.log"; do
   sleep 1
 done
 echo 'Installer kernel booted with the unattended kickstart arguments'
+while kill -0 "$pid" 2>/dev/null; do
+  if grep -Eq 'AnacondaError:|Cannot finalize fstab:|Pane is dead \(status [1-9]|Kernel panic - not syncing' "$state/install.log"; then
+    echo 'Installer reported a fatal error; stopping the VM. See install.log.' >&2
+    exit 1
+  fi
+  sleep 2
+done
 install_status=0
 wait "$pid" || install_status=$?
 wait "$log_pid" || true
