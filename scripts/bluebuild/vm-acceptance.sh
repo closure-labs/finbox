@@ -110,6 +110,7 @@ boot_vm() {
     kill -0 "$pid"
     if ssh "${ssh_args[@]}" true 2>/dev/null; then
       printf 'SSH ready for %s at %s\n' "$phase" "$(date -u +%FT%TZ)"
+      ssh "${ssh_args[@]}" sudo bash -s <scripts/bluebuild/wait-nix.sh | tee "$state/$phase-nix.log"
       return
     fi
     sleep 5
@@ -146,8 +147,6 @@ set -euo pipefail
 echo 'Checking profile, SELinux and Nix daemon startup'
 [[ $(cat /usr/share/finite/build-profile) == "$1" ]]
 [[ $(getenforce) == Enforcing ]]
-sudo systemctl is-active finite-nix-seed.service finite-nix-selinux.service nix.mount
-sudo systemctl is-active nix-daemon.socket determinate-nixd.socket
 mountpoint /nix
 /nix/var/nix/profiles/default/bin/nix store ping --store daemon
 printf 'persistent-nix-state\n' | sudo tee /var/home/nix/finite-acceptance >/dev/null

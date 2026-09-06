@@ -47,6 +47,7 @@ in {
     bash tests/home/dell-panel-policy.sh
   '';
   nix-lifecycle = check "nix-lifecycle" (with pkgs; [gnugrep jq systemd util-linux]) ''
+    bash tests/bluebuild/nix-readiness.sh
     bash modules/aspects/base/tests/determinate-version.sh
     bash modules/aspects/base/tests/nix-lifecycle.sh
     bash modules/aspects/base/tests/nix-systemd.sh

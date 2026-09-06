@@ -71,4 +71,6 @@ production cutover. The script refuses local execution outside finbox Actions.
 
 The Actions log streams the guest console and timestamps each boot phase. The
 unattended installer kernel must start within three minutes; installation has
-a 45-minute limit. Failure artifacts retain the console logs for diagnosis.
+a 45-minute limit. After SSH becomes available, the test waits up to three
+minutes for every Nix initialization unit and daemon socket to become active.
+Failure artifacts retain the console and Nix service logs for diagnosis.
