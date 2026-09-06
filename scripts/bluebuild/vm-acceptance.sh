@@ -42,13 +42,7 @@ chmod 0440 /etc/sudoers.d/finite-test
 systemctl enable sshd
 %end
 KS
-# Follow the upstream test: add unattended answers to a temporary ISO copy.
-xorriso -osirrox on -indev "${isos[0]}" -extract /boot/grub2/grub.cfg "$state/grub.cfg"
-sed -i -e 's/quiet/console=ttyS0,115200n8 inst.ks=cdrom:\/ks.cfg/g' \
-  -e 's/set default=.*/set default="0"/' -e 's/set timeout=.*/set timeout=1/' "$state/grub.cfg"
-xorriso -indev "${isos[0]}" -outdev "$state/install.iso" -boot_image any replay \
-  -map "$state/ks.cfg" /ks.cfg -chmod 0444 /ks.cfg -- \
-  -map "$state/grub.cfg" /boot/grub2/grub.cfg
+bash scripts/bluebuild/prepare-vm-iso.sh "${isos[0]}" "$state/ks.cfg" "$state"
 cp /usr/share/OVMF/OVMF_VARS_4M.fd "$state/OVMF_VARS.fd"
 qemu-img create -f qcow2 "$state/disk.qcow2" 64G
 qemu_args=(
@@ -59,27 +53,59 @@ qemu_args=(
   -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22" -device "virtio-net-pci,netdev=net0"
 )
 pid=
+log_pid=
+stream_console() {
+  touch "$1"
+  tail --pid="$pid" -n +1 -F "$1" &
+  log_pid=$!
+}
 cleanup() {
   if [[ -n $pid ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+  if [[ -n $log_pid ]]; then kill "$log_pid" 2>/dev/null || true; wait "$log_pid" 2>/dev/null || true; fi
   rm -f "$state/ssh-key" "$state/install.iso" "$state/disk.qcow2"
 }
 trap cleanup EXIT
 # timeout also bounds Anaconda errors that leave the installer UI waiting.
+printf 'Starting unattended UEFI installation at %s (45-minute limit)\n' "$(date -u +%FT%TZ)"
 timeout 45m qemu-system-x86_64 "${qemu_args[@]}" -boot d -cdrom "$state/install.iso" \
   -serial "file:$state/install.log" &
 pid=$!
-wait "$pid"
+stream_console "$state/install.log"
+# Fail promptly if UEFI never reaches the kernel with our unattended arguments.
+boot_deadline=$((SECONDS + 180))
+until grep -qF 'inst.ks=cdrom:/ks.cfg' "$state/install.log"; do
+  if ! kill -0 "$pid" 2>/dev/null || ((SECONDS >= boot_deadline)); then
+    echo 'Installer kernel did not report its unattended arguments within three minutes.' >&2
+    exit 1
+  fi
+  sleep 1
+done
+echo 'Installer kernel booted with the unattended kickstart arguments'
+install_status=0
+wait "$pid" || install_status=$?
+wait "$log_pid" || true
 pid=
+log_pid=
+if ((install_status != 0)); then
+  echo "Installer exited with status $install_status; see install.log (124 means timeout)." >&2
+  exit "$install_status"
+fi
+printf 'Installer shut down at %s\n' "$(date -u +%FT%TZ)"
 rm "$state/install.iso"
 ssh_args=(-i "$state/ssh-key" -p 2222 -o BatchMode=yes -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 finite-test@127.0.0.1)
 boot_vm() {
   local phase=$1
+  printf 'Booting %s at %s\n' "$phase" "$(date -u +%FT%TZ)"
   qemu-system-x86_64 "${qemu_args[@]}" -boot c -serial "file:$state/$phase.log" &
   pid=$!
+  stream_console "$state/$phase.log"
   for _ in {1..120}; do
     kill -0 "$pid"
-    if ssh "${ssh_args[@]}" true 2>/dev/null; then return; fi
+    if ssh "${ssh_args[@]}" true 2>/dev/null; then
+      printf 'SSH ready for %s at %s\n' "$phase" "$(date -u +%FT%TZ)"
+      return
+    fi
     sleep 5
   done
   echo "SSH did not become available during $phase" >&2
@@ -88,7 +114,13 @@ boot_vm() {
 poweroff_vm() {
   ssh "${ssh_args[@]}" sudo systemctl poweroff || true
   for _ in {1..60}; do
-    if ! kill -0 "$pid" 2>/dev/null; then wait "$pid"; pid=; return; fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid"
+      wait "$log_pid" || true
+      pid=
+      log_pid=
+      return
+    fi
     sleep 2
   done
   echo 'Guest did not shut down' >&2
@@ -105,6 +137,7 @@ jq -e --arg installed "$installed_digest" --arg index "${source##*@}" \
   "$state/source-manifest.json" >/dev/null
 ssh "${ssh_args[@]}" bash -s -- "$profile" <<'GUEST'
 set -euo pipefail
+echo 'Checking profile, SELinux and Nix daemon startup'
 [[ $(cat /usr/share/finite/build-profile) == "$1" ]]
 [[ $(getenforce) == Enforcing ]]
 sudo systemctl is-active finite-nix-seed.service finite-nix-selinux.service nix.mount
@@ -117,10 +150,12 @@ jq -n --arg foundation "$(jq -r .foundation /usr/share/finite/profile.json)" \
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 export FINITE_NIX_COMMAND=/nix/var/nix/profiles/default/bin/nix
+echo 'Building and activating the base Home Manager environment'
 /usr/libexec/finite/home-init --profile "$HOME/profile.json"
 printf '\n# VM acceptance customization\n' >>"$HOME/.config/home-manager/customize.nix"
 GUEST
 # Use a deliberately wrong public key, then restore policy even if the test fails.
+echo 'Testing rejection with the wrong signing key'
 ssh "${ssh_args[@]}" bash -s -- "$channel" <<'GUEST'
 set -euo pipefail
 work=$(mktemp -d)
@@ -139,12 +174,15 @@ if sudo bootc switch --enforce-container-sigpolicy "$1" >"$work/rejection.log" 2
 fi
 grep -Ei 'invalid signature|no matching signatures|none of the signatures|signature verification failed' "$work/rejection.log"
 GUEST
+echo 'Selecting the signed ongoing update channel'
 ssh "${ssh_args[@]}" sudo bootc switch --enforce-container-sigpolicy "$channel"
 ssh "${ssh_args[@]}" sudo bootc status --json >"$state/staged.json"
 jq -e '.status.staged != null' "$state/staged.json" >/dev/null
 poweroff_vm
 boot_vm updated
 ssh "${ssh_args[@]}" sudo bootc status --json >"$state/updated.json"
+jq -e --arg channel "$channel" '.status.booted.image.image.image == $channel' \
+  "$state/updated.json" >/dev/null
 ssh "${ssh_args[@]}" bash -s <<'GUEST'
 set -euo pipefail
 [[ $(cat /var/home/nix/finite-acceptance) == persistent-nix-state ]]
@@ -157,6 +195,8 @@ boot_vm rollback
 ssh "${ssh_args[@]}" sudo bootc status --json >"$state/rollback.json"
 initial=$(jq -er '.status.booted.ostree.checksum' "$state/first-boot.json")
 jq -e --arg initial "$initial" '.status.booted.ostree.checksum == $initial' "$state/rollback.json" >/dev/null
+jq -e --arg tag "$installation_tag" '.status.booted.image.image.image == $tag' \
+  "$state/rollback.json" >/dev/null
 ssh "${ssh_args[@]}" sudo journalctl -b -u finite-nix-seed -u finite-nix-selinux -u nix-daemon \
   >"$state/nix-journal.log"
 poweroff_vm

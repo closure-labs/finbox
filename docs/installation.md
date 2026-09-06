@@ -59,3 +59,7 @@ the continuing channel, checks persistent Nix state/customization after updating
 and rolls back. It uploads logs and status records; disks and SSH keys stay on
 the ephemeral runner and are removed. Run this for generic and next ISOs before
 production cutover. The script refuses local execution outside finbox Actions.
+
+The Actions log streams the guest console and timestamps each boot phase. The
+unattended installer kernel must start within three minutes; installation has
+a 45-minute limit. Failure artifacts retain the console logs for diagnosis.

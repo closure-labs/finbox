@@ -56,6 +56,9 @@ in {
     python3 tests/bluebuild/iso.py
     python3 tests/bluebuild/kernel.py
   '';
+  vm-iso = check "vm-iso-layout" (with pkgs; [diffutils gnugrep gnused libisoburn mtools]) ''
+    bash tests/bluebuild/vm-iso.sh
+  '';
   dependency-updates =
     check "dependency-update-contracts" (with pkgs; [
       gnugrep
