@@ -60,10 +60,8 @@ it into persistent `/var/home/nix`, installs the SELinux policy and mounts `/nix
 before enabling daemon sockets. Home Manager's first-login flow and standalone
 configuration templates remain available; see [configuration](configuration.md).
 
-Dakota source remains in `installer/` for acceptance comparison. Its former
-workflow is dormant in `legacy/workflows`; deletion awaits a successful upstream
-ISO install and update test. The running workstation is switched separately,
-with its previous deployment retained.
+Switch the running workstation separately after sandbox acceptance, retaining
+its previous deployment.
 
 ## Hosted VM acceptance
 

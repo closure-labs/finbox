@@ -8,7 +8,6 @@
   project,
   ...
 }: let
-  inherit (config) den;
   system = project.platform.system;
   pkgs = mkPkgs system;
   treefmtEval = outputDependencies.treefmt.evalModule pkgs ../treefmt.nix;
@@ -39,60 +38,18 @@
       zsh
     ])
     ++ [treefmtEval.config.build.wrapper];
-  profileSet = import ../lib/eval-profile-graph.nix {
-    inherit catalog lib project;
-    profileEntities = config.finite.profiles;
-    profileHosts = config.den.hosts.${system};
-  };
-  inherit (profileSet) profiles;
-  bluefin = config.finite.sources.bluefin;
-  bluefinDx = config.finite.sources.bluefinDx;
   home = config.finite.home;
-  dakotaInstallerLock = builtins.fromJSON (builtins.readFile ../sources/dakota-installer.json);
-  dakotaIsoSource = pkgs.fetchFromGitHub {
-    inherit (dakotaInstallerLock.iso_source) owner;
-    repo = dakotaInstallerLock.iso_source.repository;
-    rev = dakotaInstallerLock.iso_source.revision;
-    hash = dakotaInstallerLock.iso_source.hash;
-  };
-  bootcInstallerBundle = pkgs.fetchurl {
-    name = "finite-bootc-installer-${dakotaInstallerLock.installer.version}.flatpak";
-    inherit (dakotaInstallerLock.installer) url sha256;
-  };
-  determinateNix = config.finite.sources.determinateNix;
   inherit (project) cache;
-  determinateNixInstaller = pkgs.fetchurl {
-    name = "determinate-nix-installer-${determinateNix.version}";
-    inherit (determinateNix.installer) url sha256;
-  };
-  determinateNixSelinuxPolicy = pkgs.fetchurl {
-    name = "determinate-nix-selinux-policy-${determinateNix.version}";
-    inherit (determinateNix.selinuxPolicy) url sha256;
-  };
-  determinateNixSelinuxFileContexts = pkgs.fetchurl {
-    name = "determinate-nix-selinux-file-contexts-${determinateNix.version}";
-    inherit (determinateNix.selinuxFileContexts) url sha256;
-  };
   version = lib.removeSuffix "\n" (builtins.readFile ../VERSION);
   homeScaffold = import ../lib/render-home-scaffold.nix {
     inherit pkgs version;
   };
-  generated = import ../lib/render-profile-artifacts.nix {
-    inherit determinateNixInstaller determinateNixSelinuxFileContexts determinateNixSelinuxPolicy homeScaffold lib pkgs profiles;
-    domainCatalog = catalog;
-    profileOrder = profileSet.order;
-    inherit version;
-  };
   imagePayload = import ../lib/image-payload.nix {
     inherit pkgs lib catalog homeScaffold version;
   };
-  architecture = import ../lib/render-architecture.nix {
-    inherit den lib pkgs;
-    inherit (outputDependencies) diagram;
-  };
   baseApplications = import ../lib/flake-applications.nix {
     devenv = outputDependencies.devenvPackage;
-    inherit bluefin bluefinDx bootcInstallerBundle dakotaInstallerLock dakotaIsoSource determinateNix generated pkgs version;
+    inherit pkgs;
     cacheName = cache.name;
     secretspec = outputDependencies.weeklySecretspec;
   };
@@ -107,7 +64,6 @@
     imports =
       [
         outputDependencies.denFlakeModule
-        ../modules/sources/oci-locks.nix
         ../modules/aspects/base/default.nix
         ../modules/aspects/capabilities/devops/default.nix
       ]
@@ -208,6 +164,11 @@
     // {
       formatting = formattingCheck;
       home-configurations = homeCheck;
+      cache-configuration = assert lib.assertMsg ((import ../flake.nix).nixConfig == project.nixConfig)
+      "Keep the concrete flake cache configuration synchronized with project-policy.nix";
+        pkgs.runCommand "finite-cache-configuration" {} ''
+          touch "$out"
+        '';
     };
   ciChecks = pkgs.runCommand "finite-ci-checks" {} ''
     mkdir "$out"
@@ -220,36 +181,9 @@
   '';
   ciCheck = applications.mkCheck checks;
   localCache = applications.mkLocalCache ciCheck;
-  legacyExportTable = {
-    architecture.package = architecture;
-    ci-prepare.package = applications.ciPrepare;
-    ci-validate-plan.package = applications.validateCiPlan;
-    ci-gate.package = applications.ciGate;
-    ci-validate-image-shard.package = applications.validateImageShard;
-    ci-image-reuse.package = applications.imageReuse;
-    ci-image-verify.package = applications.imageVerify;
-    ci-image-sign.package = applications.imageSign;
-    ci-profile-stage.package = applications.profileStage;
-    ci-rechunk-image.package = applications.rechunkImage;
-    ci-image-build.package = applications.imageBuild;
-    ci-image-sbom.package = applications.imageSbom;
-    ci-sbom-attestation.package = applications.sbomAttestation;
-    ci-promote-images.package = applications.promoteImages;
-    ci-installer-build.package = applications.installerBuild;
-    ci-installer-e2e.package = applications.installerE2e;
-    ci-installer-smoke.package = applications.installerSmoke;
-    ci-release-notes.package = applications.releaseNotes;
-    ci-release-control.package = applications.releaseControl;
-    ci-source-verify.package = applications.sourceVerify;
-    ci-package-cleanup.package = applications.packageCleanup;
-    ci-load-bluefin.package = applications.loadBluefin;
-    generated.package = generated;
-    syft.package = pkgs.syft;
-  };
   exportTable = {
     ci-check.package = ciCheck;
     ci-checks.package = ciChecks;
-    ci-github-output.package = applications.githubOutput;
     ci-fix-nix-hashes.package = applications.fixNixHashes;
     ci-update-locks.package = applications.updateLocks;
     ci-home-release-update.package = applications.updateHomeRelease;
@@ -260,7 +194,6 @@
     ci-github-actions-secrets.package = applications.githubActionsSecrets;
     ci-lock-validate.package = applications.validateLocks;
     ci-cosign.package = pkgs.cosign;
-    ci-oras.package = pkgs.oras;
     ci-skopeo.package = pkgs.skopeo;
     devenv = {
       package = outputDependencies.devenvPackage;
@@ -299,9 +232,8 @@
 in {
   flake = {
     lib.finite = {
-      inherit home profiles;
+      inherit home;
       inherit cache catalog;
-      profileOrder = profileSet.order;
     };
     flakeModules.home = homeFlakeModule;
     templates = {
@@ -319,7 +251,6 @@ in {
       };
     };
     packages.${system} = packageExports;
-    legacyPackages.${system} = lib.mapAttrs (_: export: export.package) legacyExportTable;
 
     apps.${system} = appExports;
 
@@ -328,9 +259,6 @@ in {
     devShells.${system} = {
       default = pkgs.mkShell {
         packages = repositoryToolchain;
-      };
-      installer = pkgs.mkShell {
-        packages = [pkgs.qemu];
       };
     };
 

@@ -9,9 +9,12 @@
     root = ../.;
     fileset = lib.fileset.unions [
       ../.github
+      ../automation
       ../recipes
       ../files/scripts
       ../files/installer
+      ../files/system
+      ../files/dnf
       ../scripts/bluebuild
       ../tests
       ../modules/aspects
@@ -21,6 +24,7 @@
       ../VERSION
       ../flake.nix
       ../flake.lock
+      ../devenv.lock
       ../docs
     ];
   };
@@ -49,9 +53,9 @@ in {
   '';
   nix-lifecycle = check "nix-lifecycle" (with pkgs; [gnugrep jq systemd util-linux]) ''
     bash tests/bluebuild/nix-readiness.sh
-    bash modules/aspects/base/tests/determinate-version.sh
-    bash modules/aspects/base/tests/nix-lifecycle.sh
-    bash modules/aspects/base/tests/nix-systemd.sh
+    bash tests/nix/determinate-version.sh
+    bash tests/nix/nix-lifecycle.sh
+    bash tests/nix/nix-systemd.sh
   '';
   bluebuild = check "bluebuild-contracts" [pkgs.jq (pkgs.python3.withPackages (p: [p.pyyaml]))] ''
     python3 tests/bluebuild/contracts.py
@@ -74,10 +78,18 @@ in {
       bash tests/automation/trusted-update.sh
       bash tests/automation/update-home-release.sh
     '';
+  dependency-locks = check "dependency-locks" [applications.validateLocks] ''
+    ${lib.getExe applications.validateLocks}
+  '';
   workflows = check "workflow-lint" (with pkgs; [actionlint shellcheck zizmor]) ''
     actionlint .github/workflows/*.yml
     zizmor --offline --no-config --collect=all .github
     shellcheck --exclude=SC1091 files/scripts/*.sh scripts/bluebuild/*.sh
     shellcheck -s bash files/installer/install_finite_fstab
+  '';
+  repository-security = check "repository-security" (with pkgs; [jq applications.repositorySecurityAudit]) ''
+    bash tests/automation/repository-security.sh \
+      ${lib.getExe applications.repositorySecurityAudit} \
+      automation/github/repository-security.json tests/fixtures/repository-security
   '';
 }

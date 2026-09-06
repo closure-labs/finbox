@@ -32,34 +32,5 @@
     "secret_scanning": true,
     "secret_scanning_push_protection": true
   },
-  "environments": {
-    "package-cleanup": {
-      "can_admins_bypass": false,
-      "prevent_self_review": false,
-      "required_reviewers": [
-        "declarative-dale"
-      ],
-      "deployment_branch_policy": {
-        "protected_branches": false,
-        "custom_branch_policies": true,
-        "branches": [
-          "main"
-        ]
-      }
-    },
-    "release": {
-      "can_admins_bypass": false,
-      "prevent_self_review": false,
-      "required_reviewers": [
-        "declarative-dale"
-      ],
-      "deployment_branch_policy": {
-        "protected_branches": false,
-        "custom_branch_policies": true,
-        "branches": [
-          "main"
-        ]
-      }
-    }
-  }
+  "environments": {}
 }

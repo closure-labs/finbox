@@ -8,11 +8,7 @@ bluefin-next|bluefin-dx-next) output=image-payload-next ;;
 esac
 payload=$(nix build --accept-flake-config --no-link --print-out-paths ".#$output")
 test -d "$payload/home-manager-template"
-rm -rf files/payload files/system files/scripts/lib
-mkdir -p files/payload files/system files/scripts/lib files/dnf
+rm -rf files/payload
+mkdir -p files/payload
 cp -a "$payload/." files/payload/
-cp -a modules/aspects/base/rootfs/. files/system/
-mv files/system/etc/yum.repos.d/terra.repo files/dnf/terra.repo
-cp modules/aspects/base/install-determinate-nix.sh files/scripts/lib/
-cp modules/aspects/base/install-nix-systemd-units.sh files/scripts/lib/
-chmod -R u+w files/payload files/system files/scripts/lib
+chmod -R u+w files/payload

@@ -37,11 +37,8 @@ replace the public half in the repository. Validate signatures and host policy
 before any signature-enforced bootc switch. Sandbox package visibility must
 permit the installer to pull the image.
 
-The former graph promotion, registry repair, release state machine, mandatory
-SBOM/provenance publication, installer cache and Bluefin digest updater are not
-part of this workflow. Their code and workflow copies remain dormant under the
-legacy path until replacements pass acceptance. Nix dependency updates and the
-Determinate checksum lock update remain available. The repository policy allows
+Nix dependency updates and the Determinate checksum lock update remain
+available. The repository policy allows
 the pinned BlueBuild action and its transitive actions.
 
 Use the manual **Build installation ISO** workflow with a channel and a verified

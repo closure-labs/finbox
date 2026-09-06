@@ -103,7 +103,7 @@
     '';
   };
   homeInitBody = pkgs.lib.removePrefix "#!/usr/bin/env bash\n" (
-    builtins.readFile ../modules/aspects/base/rootfs/usr/libexec/finite/home-init
+    builtins.readFile ../files/system/usr/libexec/finite/home-init
   );
   homeInit = pkgs.writeShellApplication {
     name = "finite-home-init";
