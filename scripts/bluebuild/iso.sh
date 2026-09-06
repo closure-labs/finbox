@@ -28,15 +28,18 @@ case "$channel:$profile" in
 bluefin-generic:bluefin-generic|latest:bluefin-generic|next:bluefin-next|bluefin-dx-generic:bluefin-dx-generic|dev-next:bluefin-dx-next) ;;
 *) echo 'Image profile does not match the requested channel' >&2; exit 1 ;;
 esac
+bash "$(dirname "${BASH_SOURCE[0]}")/prepare-installer.sh"
 skopeo copy --all --preserve-digests "docker://$source" "docker://$repository:$tag"
 [[ $(skopeo inspect --format '{{.Digest}}' "docker://$repository:$tag") == "$digest" ]]
 cosign verify --key cosign.pub "$repository:$tag" >/dev/null
 jq -n --arg image "$source" --arg tag "$repository:$tag" \
   --arg channel "$repository:$channel" --arg profile "$profile" \
-  '{image: $image, installationTag: $tag, updateChannel: $channel, profile: $profile}' \
+  --slurpfile installer .bluebuild/iso/installer.json \
+  '{image: $image, installationTag: $tag, updateChannel: $channel, profile: $profile,
+    installer: $installer[0]}' \
   >.bluebuild/iso/installation.json
 # v0.9.37 constructs IMAGE_TAG from a tag; a digest-only reference becomes latest.
-sudo bluebuild generate-iso --variant kinoite --output-dir .bluebuild/iso \
+sudo bluebuild generate-iso --run-driver docker --variant kinoite --output-dir .bluebuild/iso \
   --iso-name "finbox-$profile.iso" image "$repository:$tag"
 # Confirm that the install source tag has not changed while the ISO was assembled.
 [[ $(skopeo inspect --format '{{.Digest}}' "docker://$repository:$tag") == "$digest" ]]

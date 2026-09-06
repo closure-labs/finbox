@@ -25,6 +25,15 @@ workflow verifies a digest, copies it to this unique tag with digest preservatio
 and passes the tag to `generate-iso`. Do not use that one-time tag as a permanent
 update channel.
 
+The workflow uses upstream installer v1.5.0, pinned by digest in
+`sources/bluebuild-installer.json`. CLI v0.9.37 hardcodes the older v1.4.0 image,
+so the ephemeral ISO runner gives the verified v1.5.0 image that local alias
+and explicitly uses Docker. It changes no upstream registry tags. The actual
+installer version, digest and alias are recorded in `installation.json`.
+This avoids the older Lorax cleanup that removes `load_policy`, causing
+Anaconda to fail at shutdown after installation reports completion. A preflight
+check rejects an installer that still removes this SELinux utility.
+
 After validating the installed image and its signing policy, select the channel
 recorded in `installation.json`. For example, in the disposable generic VM:
 

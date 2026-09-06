@@ -27,10 +27,18 @@ elif name=='skopeo':
   else: print(json.dumps({'Digest':digest,'Labels':{'io.finite.profile':'bluefin-next' if os.environ.get('MISMATCH_PROFILE') else 'bluefin-generic'}}))
 elif name=='sudo':
  assert args[0:2]==['bluebuild','generate-iso']
+ assert args[args.index('--run-driver')+1]=='docker'
  assert args[args.index('--variant')+1]=='kinoite'
  assert args[-2]=='image' and ':i' in args[-1] and '@' not in args[-1]
  path=pathlib.Path(args[args.index('--output-dir')+1])/args[args.index('--iso-name')+1]
  path.write_bytes(b'fixture ISO')
+elif name=='docker':
+ if args[0]=='inspect':
+  if '--format' in args: print('sha256:'+'c'*64)
+  else:
+   lock=json.loads(pathlib.Path('sources/bluebuild-installer.json').read_text())
+   print(json.dumps([{'Config':{'Labels':{'org.opencontainers.image.version':lock['version'],'org.opencontainers.image.revision':'wrong' if os.environ.get('BAD_INSTALLER_LABEL') else lock['revision']}}}]))
+ elif args[0]=='run' and os.environ.get('BAD_INSTALLER_CLEANUP'): sys.exit(1)
 '''
 
 class IsoBoundary(unittest.TestCase):
@@ -40,11 +48,14 @@ class IsoBoundary(unittest.TestCase):
         root = Path(temp.name)
         bindir = root / 'bin'
         bindir.mkdir()
-        for name in ['cosign','skopeo','sudo']:
+        for name in ['cosign','skopeo','sudo','docker']:
             tool = bindir / name
             tool.write_text(MOCK.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1))
             tool.chmod(0o755)
+        (root/'sources').mkdir()
+        (root/'sources/bluebuild-installer.json').write_text((SCRIPT.parents[2]/'sources/bluebuild-installer.json').read_text())
         env = dict(os.environ, PATH=str(bindir)+':'+os.environ['PATH'], DIGEST=DIGEST,
+                   GITHUB_ACTIONS='true', GITHUB_REPOSITORY='closure-labs/finbox',
                    GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', **extra)
         result = subprocess.run(['bash',str(SCRIPT),'bluefin-generic',DIGEST],cwd=root,env=env,capture_output=True,text=True)
         self.assertTrue((root/'calls.jsonl').exists(), result.stderr)
@@ -59,6 +70,12 @@ class IsoBoundary(unittest.TestCase):
         self.assertRegex(record['installationTag'],r':i[a-f0-9]{16}$')
         self.assertLessEqual(len('finbox-x86_64-'+record['installationTag'].split(':')[-1]),32)
         self.assertEqual(record['updateChannel'],'ghcr.io/closure-labs/finbox:bluefin-generic')
+        self.assertEqual(record['installer']['version'],'v1.5.0')
+        self.assertIn('@sha256:',record['installer']['resolvedImage'])
+        alias=next(c for c in calls if c[:2]==['docker','tag'])
+        self.assertEqual(alias[2],record['installer']['resolvedImage'])
+        self.assertEqual(alias[3],record['installer']['cliAlias'])
+        self.assertFalse(any(c[:2]==['docker','push'] for c in calls))
         copy=next(c for c in calls if c[:2]==['skopeo','copy'])
         self.assertIn('--preserve-digests',copy)
         self.assertIn('--all',copy)
@@ -68,6 +85,14 @@ class IsoBoundary(unittest.TestCase):
         _,result,calls=self.run_iso(BAD_SIGNATURE='1')
         self.assertNotEqual(result.returncode,0)
         self.assertFalse(any(c[:2]==['skopeo','copy'] or c[0]=='sudo' for c in calls))
+        self.assertFalse(any(c[0]=='docker' for c in calls))
+
+    def test_installer_must_match_its_lock_and_retain_the_policy_loader(self):
+        for failure in ['BAD_INSTALLER_LABEL','BAD_INSTALLER_CLEANUP']:
+            with self.subTest(failure=failure):
+                _,result,calls=self.run_iso(**{failure:'1'})
+                self.assertNotEqual(result.returncode,0)
+                self.assertFalse(any(c[:2] in [['skopeo','copy'],['docker','tag']] or c[0]=='sudo' for c in calls))
 
     def test_moved_channel_keeps_the_requested_verified_digest(self):
         root,result,calls=self.run_iso(MOVED_CHANNEL='1')

@@ -9,6 +9,12 @@ artifact=$(realpath "${1:?ISO artifact directory required}")
 state="$PWD/.bluebuild/vm"
 mkdir -p "$state"
 (cd "$artifact" && sha256sum -c SHA256SUMS)
+jq -e --slurpfile expected sources/bluebuild-installer.json '
+  .installer.resolvedImage == ($expected[0].image + "@" + $expected[0].digest)
+' "$artifact/installation.json" >/dev/null || {
+  echo 'Rebuild this ISO with the current locked installer before acceptance testing.' >&2
+  exit 2
+}
 source=$(jq -er .image "$artifact/installation.json")
 channel=$(jq -er .updateChannel "$artifact/installation.json")
 installation_tag=$(jq -er .installationTag "$artifact/installation.json")
