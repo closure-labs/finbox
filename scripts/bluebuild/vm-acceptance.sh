@@ -111,6 +111,11 @@ boot_vm() {
     if ssh "${ssh_args[@]}" true 2>/dev/null; then
       printf 'SSH ready for %s at %s\n' "$phase" "$(date -u +%FT%TZ)"
       ssh "${ssh_args[@]}" sudo bash -s <scripts/bluebuild/wait-nix.sh | tee "$state/$phase-nix.log"
+      ssh "${ssh_args[@]}" sudo journalctl --no-pager -b -u systemd-remount-fs \
+        >"$state/$phase-remount.log"
+      ssh "${ssh_args[@]}" systemctl --failed --no-pager >"$state/$phase-failed-units.log"
+      ssh "${ssh_args[@]}" cat /etc/fstab >"$state/$phase-fstab.log"
+      ssh "${ssh_args[@]}" findmnt --json >"$state/$phase-mounts.json"
       return
     fi
     sleep 5

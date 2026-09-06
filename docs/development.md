@@ -36,3 +36,26 @@ the dormant legacy Containerfiles, Den image composition, CI applications and
 Dakota implementation. A separate hardware cutover must retain the previous
 workstation deployment and verify graphics, PipeWire camera, Espanso,
 suspend/resume and authentication.
+
+## Sandbox acceptance evidence
+
+Verified runs for the BlueBuild replacement:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Four signed profiles, final-image assertions and `CI gate` | Passed | [Build 34003727060](https://github.com/closure-labs/finbox/actions/runs/34003727060) |
+| Four profiles with read-only publication permissions and no signing secret | Passed | [Validation 33999999603](https://github.com/closure-labs/finbox/actions/runs/33999999603) |
+| Generic ISO generation with installer v1.5.0 | Passed | [ISO 34002504402](https://github.com/closure-labs/finbox/actions/runs/34002504402) |
+| Generic UEFI installation, Nix/SELinux, Home Manager, signature rejection, update and rollback | Passed | [VM 34003726524](https://github.com/closure-labs/finbox/actions/runs/34003726524) |
+| Next-kernel ISO and VM acceptance | Pending | [ISO 34004385015](https://github.com/closure-labs/finbox/actions/runs/34004385015) |
+
+The generic VM installed signed index
+`sha256:c2ad1b5523074eddf9ed2d07dd3d396e6f1c5475e43aeba514aaf46d37b7eaba`,
+switched to the signature-enforced `bluefin-generic` channel, and rolled back to
+its original deployment checksum. Run artifacts contain the architecture
+manifest digests, bootc status records and service logs. Production and physical
+workstation acceptance remain separate gates.
+
+The successful generic run also reported `systemd-remount-fs.service` failing
+at boot. Its cause is under investigation; the next VM run captures its journal,
+mount layout and fstab. Passing the functional checks does not close that issue.
