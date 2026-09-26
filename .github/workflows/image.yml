@@ -35,7 +35,7 @@ jobs:
           docker buildx create --name bluebuild --driver docker-container
           --driver-opt default-load=true
       - name: Build with BlueBuild
-        uses: blue-build/github-action@836161eb076426a451e6a0054f722b1153b8b3ad # v1.12.0
+        uses: blue-build/github-action@c295af864f2802fc6aea227507af43d35823db81 # v1.13.0
         with:
           recipe: ${{ inputs.profile }}.yml
           cli_version: v0.9.37
